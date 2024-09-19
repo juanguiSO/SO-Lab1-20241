@@ -1,8 +1,16 @@
 #include<stdio.h>
-int main ()
+int main (int argc, char *argv[])
 {
 
-   // printf("Oh y ahora quien podra ayudarme !!!\n");
-    return 0;
+ // Verificación de cantidad de argumentos en la línea de comandos
+    if (argc == 3) {
+         return 0;
+       
+    }else{
+        fprintf(stderr, "usage: reverse <input> <output>\n");
+        return 1;
+        }
+
+   
 
 }
