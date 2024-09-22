@@ -1,4 +1,23 @@
 #include <stdio.h>
+
+// Función para verificar si dos archivos son el mismo (hardlinked)
+     int are_files_same(const char *file1, const char *file2) {
+         struct stat stat1, stat2;
+     
+         // Obtener información del primer archivo
+         if (stat(file1, &stat1) != 0) {
+             exit(1);
+         }
+     
+         // Obtener información del segundo archivo
+         if (stat(file2, &stat2) != 0) {
+             exit(1);
+         }
+     
+         // Comparar el número de dispositivo e inodo
+         return (stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino);
+     }
+
 int main(int argc, char *argv[])
 {
      // 1. Verificación de cantidad de argumentos en la línea de comandos
@@ -16,4 +35,10 @@ int main(int argc, char *argv[])
           fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
           return 1;
      }
+     
+     if (strcmp(argv[1], argv[2]) == 0 || are_files_same(argv[1], argv[2])) {
+            fprintf(stderr, "reverse: input and output file must differ\n");
+            exit(1);
+     }
+     
 }
