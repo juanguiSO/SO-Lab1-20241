@@ -1,149 +1,160 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <sys/stat.h> // Necesario para usar la estructura stat
 
-// Definición de la estructura para un nodo de la lista enlazada
-struct Node {
+// Estructura para almacenar una línea
+typedef struct Line
+{
     char *line;
-    struct Node *next;
-};
+    struct Line *next;
+} Line;
 
-// Prototipos de funciones
-void reversePrint(struct Node *head, FILE *outputFile);
-void freeList(struct Node *head);
+// Función para agregar una línea a la lista enlazada
+Line *add_line_to_list(Line *head, char *line)
+{
+    Line *new_node = (Line *)malloc(sizeof(Line));
+    if (new_node == NULL)
+    {
+        fprintf(stderr, "malloc failed\n");
+        exit(1);
+    }
+    new_node->line = strdup(line);
+    if (new_node->line == NULL)
+    {
+        fprintf(stderr, "malloc failed\n");
+        exit(1);
+    }
+    new_node->next = head;
+    return new_node;
+}
 
-int main(int argc, char *argv[]) {
-    // Declaración de variables para manejo de archivos
-    FILE *inputFile = NULL;
-    FILE *outputFile = NULL;
+// Función para liberar la memoria de la lista enlazada
+void free_line_list(Line *head)
+{
+    Line *current = head;
+    while (current != NULL)
+    {
+        Line *temp = current;
+        current = current->next;
+        free(temp->line);
+        free(temp);
+    }
+}
 
-    // Declaración de estructuras y variables para generación de lista ligada
-    struct Node *head = NULL;
-    struct Node *current = NULL;
-    char *line = NULL; 
+// Función para leer líneas de longitud indefinida
+ssize_t read_line_from_file(char **line_pointer, size_t *n, FILE *stream)
+{
+    if (*line_pointer == NULL || *n == 0)
+    {
+        *n = 128; // Tamaño inicial del buffer
+        *line_pointer = malloc(*n);
+        if (*line_pointer == NULL)
+        {
+            fprintf(stderr, "malloc failed\n");
+            exit(1);
+        }
+    }
 
-    // Declaración de variables para lectura de archivos
-    size_t len = 0;
-    ssize_t read;
+    ssize_t num_chars = getline(line_pointer, n, stream);
+    if (num_chars == -1)
+    {
+        return -1; // Error o fin de archivo
+    }
 
-    //Declaración de variables para información de comando stat
-    struct stat inputStat, outputStat;
-    int err;
+    return num_chars;
+}
 
-    // Verificación de cantidad de argumentos en la línea de comandos
-    if (argc > 3) {
+// Función para verificar si dos archivos son el mismo (hardlinked)
+int are_files_same(const char *file1, const char *file2)
+{
+    struct stat stat1, stat2;
+
+    // Obtener información del primer archivo
+    if (stat(file1, &stat1) != 0)
+    {
+        exit(1);
+    }
+
+    // Obtener información del segundo archivo
+    if (stat(file2, &stat2) != 0)
+    {
+        exit(1);
+    }
+
+    // Comparar el número de dispositivo e inodo
+    return (stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino);
+}
+
+// Función principal
+int main(int argc, char *argv[])
+{
+    FILE *input_file = stdin;
+    FILE *output_file = stdout;
+    Line *lines = NULL;
+    char *buffer = NULL;
+    size_t buffer_size = 0;
+
+    // Manejo de argumentos
+    if (argc > 3)
+    {
         fprintf(stderr, "usage: reverse <input> <output>\n");
         exit(1);
     }
 
-    // Abrir el archivo de entrada
-    if (argc > 1) {
-        inputFile = fopen(argv[1], "r");
-        if (inputFile == NULL) {
+    if (argc == 2)
+    {
+        input_file = fopen(argv[1], "r");
+        if (input_file == NULL)
+        {
             fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
             exit(1);
         }
-        
-        // Llamado a función stat para obtener el inode del archivo de entrada
-        err = stat(argv[1], &inputStat);
-        if (err < 0) {
-            fprintf(stderr, "error: executing stat function for input file");
-            exit(1);
-        }
-    } else {
-        inputFile = stdin; // Utilizar la entrada estándar si no se especifica archivo de entrada
     }
 
-    // Validaciones en caso de ejecución con archivos de entrada y salida
-    if (argc == 3 ) {
-       
-        // Abrir el archivo de salida
-        outputFile = fopen(argv[2], "w");
-        if (outputFile == NULL) {
-            fprintf(stderr, "error: cannot open file '%s'\n", argv[2]);
+    if (argc == 3)
+    {
+        input_file = fopen(argv[1], "r");
+        if (input_file == NULL)
+        {
+            fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
+            exit(1);
+        }
+        output_file = fopen(argv[2], "w");
+        if (output_file == NULL)
+        {
+            fprintf(stderr, "reverse: cannot open file '%s'\n", argv[2]);
             exit(1);
         }
 
-        // Llamado a función stat para obtener el inode del archivo de salida
-        err = stat(argv[2], &outputStat);
-        if (err < 0) {
-            fprintf(stderr,"error: executing stat function for output file");
-            exit(1);
-        }
-
-        if (strcmp(argv[1], argv[2]) == 0 || inputStat.st_ino == outputStat.st_ino) {
+        if (strcmp(argv[1], argv[2]) == 0 || are_files_same(argv[1], argv[2]))
+        {
             fprintf(stderr, "reverse: input and output file must differ\n");
             exit(1);
         }
-        
-    } else {
-        outputFile = stdout; // Utilizar la salida estándar si no se especifica archivo de salida
     }
 
-    // Leer el archivo línea por línea y almacenarlo en la lista enlazada
-    while ((read = getline(&line, &len, inputFile)) != -1) {
-        struct Node *newNode = (struct Node *) malloc(sizeof(struct Node));
-        if (newNode == NULL) {
-            fprintf(stderr, "malloc failed\n");
-            exit(1);
-        }
-
-        // Inicializa atributos de estructura del nodo creado
-        newNode->line = strdup(line); // Almacenar la línea en el nodo
-        newNode->next = NULL;
-
-        // Generando la lista ligada
-        if (head == NULL) {
-            head = newNode;
-            current = newNode;
-        } else {
-            current->next = newNode;
-            current = newNode;
-        }
+    // Leer el archivo de entrada línea por línea y agregar a la lista
+    while (read_line_from_file(&buffer, &buffer_size, input_file) != -1)
+    {
+        lines = add_line_to_list(lines, buffer);
     }
 
-    // Cerrar el archivo de entrada si no es la entrada estándar
-    if (inputFile != stdin) {
-        fclose(inputFile);
+    // Imprimir las líneas en orden inverso
+    Line *current = lines;
+    while (current != NULL)
+    {
+        fprintf(output_file, "%s", current->line);
+        current = current->next;
     }
 
-    // Imprimir la lista en orden inverso en el archivo de salida
-    reversePrint(head, outputFile);
-
-    // Cerrar el archivo de salida si no es la salida estándar
-    if (outputFile != stdout) {
-        fclose(outputFile);
-    }
-
-    // Liberar la memoria de la lista enlazada
-    freeList(head);
-
-    // Liberar memoria de la línea
-    if (line) {
-        free(line);
-    }
+    // Limpiar
+    free_line_list(lines);
+    free(buffer); // Liberar el buffer
+    if (input_file != stdin)
+        fclose(input_file);
+    if (output_file != stdout)
+        fclose(output_file);
 
     return 0;
-}
-
-// Función para imprimir la lista en orden inverso
-void reversePrint(struct Node *head, FILE *outputFile) {
-    if (head == NULL) {
-        return;
-    }
-    reversePrint(head->next, outputFile);
-    fprintf(outputFile, "%s", head->line);
-}
-
-// Función para liberar la memoria de la lista enlazada
-void freeList(struct Node *head) {
-    struct Node *temp;
-    while (head != NULL) {
-        temp = head;
-        head = head->next;
-        free(temp->line); // Liberar la memoria de la línea
-        free(temp); // Liberar la memoria del nodo
-    }
 }
