@@ -35,7 +35,15 @@ int main(int argc, char *argv[])
           fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
           return 1;
      }
-     // 2. Verificar que los archivos sean diferentes
+     // 3. Verificar que se pueda abrir el archivo
+     if (argc == 2) {
+        input_file = fopen(argv[1], "r");
+        if (input_file == NULL) {
+            fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
+            exit(1);
+        }
+     }
+     // 4. Verificar que los archivos sean diferentes
      if (strcmp(argv[1], argv[2]) == 0 || are_files_same(argv[1], argv[2])) {
             fprintf(stderr, "reverse: input and output file must differ\n");
             exit(1);
